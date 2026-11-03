@@ -172,6 +172,29 @@ label.btn{display:inline-flex;align-items:center}
   .field,.btn{min-height:44px} .icon{padding:8px}
 }
 @media (prefers-reduced-motion:reduce){.card-in,.bar i{transition:none}}
+/* full-screen viewer: one word per screen, swipe sideways */
+.btn.wide{width:100%}
+.btn.danger{color:var(--bad)}
+.item[data-open]{cursor:pointer}
+.viewer{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top,0px)) 16px calc(14px + env(safe-area-inset-bottom,0px));overscroll-behavior:contain}
+.v-top{display:flex;justify-content:space-between;align-items:center;font-family:var(--f-mono);font-size:.85rem;color:var(--muted);min-height:44px}
+.v-x{background:none;border:0;font-size:1.4rem;width:44px;height:44px;cursor:pointer;color:var(--ink);border-radius:6px}
+.v-x:hover{background:var(--soft)}
+.v-track{flex:1;min-height:0;position:relative;overflow:hidden;touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.v-card{position:absolute;inset:0;overflow-y:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px 22px;display:flex;flex-direction:column;gap:14px;align-items:center;text-align:center;will-change:transform}
+.v-card>:first-child{margin-top:auto}.v-card>:last-child{margin-bottom:auto}
+.v-word{font-family:var(--f-head);font-size:clamp(2.4rem,12vw,4.2rem);line-height:1.05;overflow-wrap:anywhere}
+.v-card.repeat .v-word{background:linear-gradient(transparent 55%,var(--mark) 55%,var(--mark) 90%,transparent 90%)}
+.v-meta{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;align-items:center}
+.v-meta .ipa{font-size:.95rem}
+.v-say{background:var(--soft);border:0;border-radius:24px;padding:10px 18px;cursor:pointer;color:var(--ink);font-weight:600;display:inline-flex;gap:6px;align-items:center}
+.v-mean{font-size:1.4rem;font-weight:700;max-width:30ch;overflow-wrap:anywhere}
+.v-def{color:var(--muted);font-size:.95rem;max-width:40ch}
+.v-ex{font-style:italic;font-size:1.05rem;max-width:40ch;border-top:1px solid var(--line);padding-top:14px;overflow-wrap:anywhere}
+.v-ex .exko{color:var(--muted);font-size:.92rem;margin-top:6px}
+.v-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:12px}
+.v-nav .btn{min-height:48px;min-width:96px}
+.v-tip{font-size:.8rem;color:var(--muted);text-align:center}
 </style>
 </head>
 <body>
@@ -201,6 +224,7 @@ label.btn{display:inline-flex;align-items:center}
         <label class="btn" for="bk-file">백업 파일 불러오기</label>
         <input type="file" id="bk-file" accept="application/json,.json" hidden>
       </div>
+      <div><button class="btn danger" id="bk-clear" type="button">단어 모두 지우기</button></div>
     </details>
   </header>
 
@@ -212,31 +236,14 @@ label.btn{display:inline-flex;align-items:center}
 
   <main id="view"></main>
 </div>
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="단어 크게 보기" hidden>
+  <div class="v-top"><span id="v-count"></span><button class="v-x" id="v-close" type="button" aria-label="닫기">✕</button></div>
+  <div class="v-track" id="v-track"></div>
+  <div class="v-nav"><button class="btn" id="v-prev" type="button">‹ 이전</button><span class="v-tip">옆으로 밀어서 넘기기</span><button class="btn" id="v-next" type="button">다음 ›</button></div>
+</div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
-const SAMPLES=[
- ["ephemeral","덧없는, 순식간의","Fame in the age of social media is often ephemeral."],
- ["meticulous","꼼꼼한, 세심한","She kept meticulous notes during every meeting."],
- ["resilient","회복력 있는","Children are often more resilient than adults expect."],
- ["ambiguous","애매한, 모호한","The ending of the movie was deliberately ambiguous."],
- ["diligent","부지런한, 성실한","A diligent student reviews new words every day."],
- ["abundant","풍부한","The region has abundant fresh water."],
- ["reluctant","꺼리는, 마지못한","He was reluctant to admit his mistake."],
- ["inevitable","불가피한","Some delays are inevitable in a project this size."],
- ["candid","솔직한","Thank you for your candid feedback."],
- ["scrutinize","면밀히 조사하다","Investors will scrutinize the company's report."],
- ["mitigate","완화하다","Planting trees can mitigate the effects of heat."],
- ["profound","깊은, 심오한","The book had a profound effect on me."],
- ["tedious","지루한, 싫증 나는","Filling out the forms was tedious work."],
- ["vivid","생생한","I still have a vivid memory of that day."],
- ["feasible","실현 가능한","Is it feasible to finish by Friday?"],
- ["compelling","설득력 있는, 강렬한","She made a compelling argument for the plan."],
- ["frugal","검소한, 절약하는","They live a frugal life to save for a house."],
- ["obsolete","구식의, 더 이상 쓰이지 않는","Fax machines are almost obsolete."],
- ["persevere","인내하다, 끝까지 해내다","If you persevere, your English will improve."],
- ["versatile","다재다능한, 다용도의","A versatile actor can play any role."]
-];
 const BOX_LABEL=["","새 단어","익히는 중","거의 앎","복습만","외움"];
 const BOX_DAYS=[0,0,1,3,7,14];
 const DAY=86400000, LSKEY="word-drawer.v1";
@@ -260,13 +267,18 @@ const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random(
 const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime()};
 const isDue=w=>(w.due||0)<=Date.now();
 
-const sampleWords=SAMPLES.map(([word,meaning,example],i)=>({id:"s"+i,word,meaning,example,box:1,due:0,right:0,wrong:0,created:i,sample:true}));
-function all(){ const real=[...words.values()]; return (loaded&&real.length===0)?sampleWords:real; }
-const usingSamples=()=>loaded&&words.size===0;
+function all(){ return [...words.values()]; }
 
 function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2200)}
 function setStatus(msg){$("#status").textContent=msg}
 $("#bk-export").onclick=exportBackup;
+$("#bk-clear").onclick=e=>{
+  const b=e.currentTarget;
+  if(!words.size){ toast("지울 단어가 없어요"); return; }
+  if(!b.dataset.arm){ b.dataset.arm=1; b.textContent="정말 "+words.size+"개 모두 지울까요? 한 번 더 누르세요"; clearTimeout(b.t); b.t=setTimeout(()=>{delete b.dataset.arm;b.textContent="단어 모두 지우기"},4000); return; }
+  delete b.dataset.arm; b.textContent="단어 모두 지우기";
+  words.clear(); session=null; quiz=null; saveLocal(); render(); toast("단어를 모두 지웠어요");
+};
 $("#bk-file").onchange=e=>{ const f=e.target.files[0]; if(f) importBackup(f); e.target.value=""; };
 
 /* ---------- storage ---------- */
@@ -330,7 +342,7 @@ function renderHeader(){
       <span class="iv">${b===1?"매일":b===5?BOX_DAYS[b]+"일마다":BOX_DAYS[b]+"일 뒤"}</span>
     </button>`).join("");
   const due=list.filter(isDue).length, tot=list.reduce((a,w)=>a+(w.right||0)+(w.wrong||0),0), ok=list.reduce((a,w)=>a+(w.right||0),0);
-  $("#summary").innerHTML=`<span>전체 <b>${list.length}</b>개</span><span>오늘 복습 <b>${due}</b>개</span><span>정답률 <b>${tot?Math.round(ok/tot*100)+"%":"–"}</b></span>${usingSamples()?'<span>예시 단어 표시 중</span>':""}`;
+  $("#summary").innerHTML=`<span>전체 <b>${list.length}</b>개</span><span>오늘 복습 <b>${due}</b>개</span><span>정답률 <b>${tot?Math.round(ok/tot*100)+"%":"–"}</b></span>`;
   document.querySelectorAll(".tab").forEach(t=>{
     t.setAttribute("aria-selected",t.dataset.tab===tab);
     if(t.dataset.tab==="cards") t.innerHTML=`카드 복습${due?`<span class="cnt">${due}</span>`:""}`;
@@ -487,6 +499,7 @@ function listShell(){
       <button class="btn chip" id="only-repeat" type="button"></button>
       <span id="filter-slot"></span>
     </div>
+    <button class="btn wide" id="view-all" type="button">⛶ 전체 화면으로 넘겨 보기</button>
     <div class="list" id="list"></div></div>`;
   const busy=(b,on,label)=>{ b.disabled=on; b.textContent=label; };
   $("#addform").onsubmit=async e=>{
@@ -546,7 +559,9 @@ function listShell(){
   $("#only-repeat").onclick=()=>{onlyRepeat=!onlyRepeat;renderListBody()};
   $("#view .stage").addEventListener("click",e=>{
     const sp=e.target.closest("[data-speak]"); if(sp){ speak(sp.dataset.speak); return; }
-    const k=e.target.closest("#keep-samples"); if(k){ k.disabled=true; const now=Date.now(); Promise.all(sampleWords.map((w,i)=>{const n={...clean(w),id:uid(),lookups:1,created:now+i};return put(n)})).then(()=>toast("예시 단어 20개를 담았어요")); return; }
+    if(e.target.closest("#view-all")){ const ids=visibleList().map(w=>w.id); if(ids.length) openViewer(ids,0); return; }
+    const it=e.target.closest("[data-open]");
+    if(it&&!e.target.closest("button,a")){ const ids=visibleList().map(w=>w.id); openViewer(ids,Math.max(0,ids.indexOf(it.dataset.open))); return; }
     const cf=e.target.closest("#clear-filter"); if(cf){ filterBox=0; render(); return; }
     const d=e.target.closest("[data-del]"); if(d){
       const id=d.dataset.del;
@@ -559,19 +574,22 @@ function renderList(){
   if(!$("#addform")) listShell();
   renderListBody();
 }
-function renderListBody(){
-  if(!$("#list")) return;
+function visibleList(){
   let list=all();
   if(filterBox) list=list.filter(w=>(w.box||1)===filterBox);
   if(query){ const q=query.toLowerCase(); list=list.filter(w=>(w.word+" "+w.meaning).toLowerCase().includes(q)); }
   if(onlyRepeat) list=list.filter(w=>seen(w)>=2);
-  list.sort((a,b)=>(b.lastSeen||b.created||0)-(a.lastSeen||a.created||0));
+  return list.sort((a,b)=>(b.lastSeen||b.created||0)-(a.lastSeen||a.created||0));
+}
+function renderListBody(){
+  if(!$("#list")) return;
+  const list=visibleList();
+  $("#view-all").disabled=!list.length;
   const repeatCount=all().filter(w=>seen(w)>=2).length;
-  $("#banner").innerHTML=usingSamples()?`<div class="banner"><span>아래는 예시 단어예요. 직접 단어를 저장하면 예시는 사라져요.</span><button class="btn" id="keep-samples" type="button">예시 20개를 내 단어장에 담기</button></div>`:"";
   const ch=$("#only-repeat"); ch.textContent=`또 나온 단어 ${repeatCount}`; ch.setAttribute("aria-pressed",onlyRepeat);
   $("#filter-slot").innerHTML=filterBox?`<button class="btn" id="clear-filter" type="button">서랍 ${filterBox} 필터 해제</button>`:"";
   $("#list").innerHTML=!loaded?`<div class="empty">불러오는 중…</div>`:list.length?list.map(w=>`
-      <div class="item ${seen(w)>=2?"repeat":""} ${flashId===w.id?"flash":""}">
+      <div class="item ${seen(w)>=2?"repeat":""} ${flashId===w.id?"flash":""}" data-open="${w.id}">
         <div class="hw"><span class="w">${esc(w.word)}</span>${w.phonetic?`<span class="ipa">${esc(w.phonetic)}</span>`:""}${w.pos?`<span class="pos">${esc(w.pos)}</span>`:""}${seen(w)>=2?`<span class="again">${seen(w)}번째 만남</span>`:""}<button class="icon" data-speak="${esc(w.word)}" aria-label="${esc(w.word)} 발음 듣기">${speakIcon}</button><a class="dict" href="https://en.dict.naver.com/#/search?query=${encodeURIComponent(w.word)}" target="_blank" rel="noopener">사전</a></div>
         <div class="mean">${esc(w.meaning)}${w.def?`<span class="def">${esc(w.def)}</span>`:""}</div>
         ${w.example?`<div class="exs">${esc(w.example)}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`:""}
@@ -587,7 +605,7 @@ function newSession(useAll){
   const pick=(useAll||!due.length)?list:due;
   session={queue:shuffle(pick).map(w=>w.id),i:0,flip:false,known:0,unknown:0,extra:!due.length||useAll};
 }
-function findWord(id){ return words.get(id)||sampleWords.find(w=>w.id===id); }
+function findWord(id){ return words.get(id); }
 function grade(ok){
   const w=findWord(session.queue[session.i]); if(!w) return;
   const box=ok?Math.min(5,(w.box||1)+1):1;
@@ -695,6 +713,76 @@ function renderQuiz(){
   const nx=$("#qnext"); if(nx){ nx.onclick=()=>{quiz.i++;renderQuiz()}; nx.focus(); }
 }
 
+
+/* ---------- full-screen viewer ---------- */
+let viewer=null;
+function openViewer(ids,i){
+  viewer={ids,i};
+  $("#viewer").hidden=false; document.body.style.overflow="hidden";
+  history.pushState({viewer:1},"");
+  try{ const r=document.documentElement.requestFullscreen; if(r) document.documentElement.requestFullscreen().catch(()=>{}); }catch(e){}
+  drawViewer();
+}
+function closeViewer(fromPop){
+  if(!viewer) return;
+  viewer=null; $("#viewer").hidden=true; document.body.style.overflow="";
+  if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  if(!fromPop&&history.state&&history.state.viewer) history.back();
+  renderListBody();
+}
+function drawViewer(){
+  const w=findWord(viewer.ids[viewer.i]);
+  if(!w){ closeViewer(); return; }
+  const n=viewer.ids.length;
+  $("#v-count").textContent=(viewer.i+1)+" / "+n;
+  $("#v-prev").disabled=viewer.i===0; $("#v-next").disabled=viewer.i===n-1;
+  $("#v-track").innerHTML=`<div class="v-card ${seen(w)>=2?"repeat":""}" id="v-card">
+    <div class="v-word">${esc(w.word)}</div>
+    <div class="v-meta">${w.phonetic?`<span class="ipa">${esc(w.phonetic)}</span>`:""}${w.pos?`<span class="pos">${esc(w.pos)}</span>`:""}${seen(w)>=2?`<span class="again">${seen(w)}번째 만남</span>`:""}<span class="pill">서랍 ${w.box||1}</span></div>
+    <button class="v-say" type="button" data-speak="${esc(w.word)}">${speakIcon} 발음 듣기</button>
+    <div class="v-mean">${esc(w.meaning)}</div>
+    ${w.def?`<div class="v-def">${esc(w.def)}</div>`:""}
+    ${w.example?`<div class="v-ex">${esc(w.example)}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`:""}
+  </div>`;
+}
+function stepViewer(d){
+  const c=$("#v-card"), n=viewer.i+d;
+  if(n<0||n>=viewer.ids.length){ c.style.transition="transform .2s"; c.style.transform=""; if(d) toast(n<0?"첫 단어예요":"마지막 단어예요"); return; }
+  c.style.transition="transform .18s ease-in,opacity .18s"; c.style.transform=`translateX(${-d*100}%)`; c.style.opacity=0;
+  setTimeout(()=>{
+    if(!viewer) return;
+    viewer.i=n; drawViewer();
+    const c2=$("#v-card"); c2.style.transition="none"; c2.style.transform=`translateX(${d*60}%)`; c2.style.opacity=0;
+    c2.offsetWidth;
+    c2.style.transition="transform .22s ease-out,opacity .22s"; c2.style.transform=""; c2.style.opacity="";
+  },180);
+}
+(function(){
+  const t=$("#v-track"); let x0=null, y0=0, dx=0, horiz=null;
+  t.addEventListener("pointerdown",e=>{ if(!viewer) return; x0=e.clientX; y0=e.clientY; dx=0; horiz=null; });
+  t.addEventListener("pointermove",e=>{
+    if(x0===null) return;
+    dx=e.clientX-x0; const dy=e.clientY-y0;
+    if(horiz===null&&(Math.abs(dx)>8||Math.abs(dy)>8)) horiz=Math.abs(dx)>Math.abs(dy);
+    if(horiz){ const c=$("#v-card"); c.style.transition="none"; c.style.transform=`translateX(${dx}px) rotate(${dx/40}deg)`; }
+  });
+  const end=()=>{
+    if(x0===null) return;
+    const moved=horiz; x0=null;
+    if(!moved) return;
+    if(dx<-60) stepViewer(1); else if(dx>60) stepViewer(-1); else stepViewer(0);
+  };
+  t.addEventListener("pointerup",end); t.addEventListener("pointercancel",end);
+  t.addEventListener("click",e=>{ const sp=e.target.closest("[data-speak]"); if(sp&&Math.abs(dx)<10) speak(sp.dataset.speak); });
+  $("#v-prev").onclick=()=>stepViewer(-1);
+  $("#v-next").onclick=()=>stepViewer(1);
+  $("#v-close").onclick=()=>closeViewer();
+  window.addEventListener("popstate",()=>closeViewer(true));
+  document.addEventListener("keydown",e=>{
+    if(!viewer) return;
+    if(e.key==="ArrowRight") stepViewer(1); else if(e.key==="ArrowLeft") stepViewer(-1); else if(e.key==="Escape") closeViewer();
+  });
+})();
 
 /* ---------- shell ---------- */
 function render(){
