@@ -1,7 +1,7 @@
 // 단어 서랍 service worker: keeps the app usable offline.
 // App files: network first (so updates arrive), cache as fallback.
 // Fonts: cache first. Dictionary/translation APIs and audio: always network.
-const CACHE = "word-drawer-v2";
+const CACHE = "word-drawer-v3";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", e => {

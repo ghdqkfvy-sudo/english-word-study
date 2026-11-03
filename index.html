@@ -194,6 +194,15 @@ label.btn{display:inline-flex;align-items:center}
 .v-ex .exko{color:var(--muted);font-size:.92rem;margin-top:6px}
 .v-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:12px}
 .v-nav .btn{min-height:48px;min-width:96px}
+.kind{font-size:.72rem;font-weight:700;border-radius:4px;padding:0 6px;white-space:nowrap;align-self:center;background:var(--soft);color:var(--primary)}
+.kind.sentence{color:var(--good);background:var(--good-bg)}
+.hw .w.long{font-family:var(--f-body);font-size:1.08rem;font-weight:600}
+.hw .w.xlong{font-family:var(--f-body);font-size:1rem;font-weight:600}
+.face .big.long,.q-word.long{font-size:clamp(1.4rem,5vw,1.9rem)}
+.face .big.xlong,.q-word.xlong{font-family:var(--f-body);font-weight:600;font-size:1.2rem;line-height:1.4}
+.v-word.long{font-size:clamp(1.8rem,8vw,2.6rem)}
+.v-word.xlong{font-family:var(--f-body);font-weight:600;font-size:1.45rem;line-height:1.4}
+#kind-seg{align-self:flex-start}
 .v-tip{font-size:.8rem;color:var(--muted);text-align:center}
 </style>
 </head>
@@ -249,9 +258,14 @@ const BOX_DAYS=[0,0,1,3,7,14];
 const DAY=86400000, LSKEY="word-drawer.v1";
 
 let words=new Map(), loaded=false, backend="none", coll=null;
-let tab="list", filterBox=0, query="", armedDel=null, onlyRepeat=false, flashId=null;
+let kindFilter="", tab="list", filterBox=0, query="", armedDel=null, onlyRepeat=false, flashId=null;
 const seen=w=>w.lookups||1;
-const findByWord=t=>[...words.values()].find(w=>w.word.toLowerCase()===t.toLowerCase());
+const norm=t=>String(t||"").toLowerCase().replace(/[’‘]/g,"'").replace(/[.!?…]+$/,"").replace(/\s+/g," ").trim();
+const findByWord=t=>{ const k=norm(t); return [...words.values()].find(w=>norm(w.word)===k); };
+const kindOf=t=>{ const n=String(t||"").trim().split(/\s+/).length; return n>=4||/[.!?]$/.test(String(t).trim())?"sentence":n>=2?"phrase":"word"; };
+const KIND_KO={word:"단어",phrase:"숙어",sentence:"문장"};
+const kindTag=w=>{ const k=kindOf(w.word); return k==="word"?"":`<span class="kind ${k}">${KIND_KO[k]}</span>`; };
+const longCls=w=>w.word.length>40?" xlong":w.word.length>18?" long":"";
 function meetAgain(w,newMeaning){
   const n=seen(w)+1, p={lookups:n,box:1,due:0,lastSeen:Date.now()};
   if(newMeaning&&!w.meaning.includes(newMeaning)) p.meaning=w.meaning+", "+newMeaning;
@@ -437,12 +451,14 @@ async function toKoreanMM(text){
   return [...new Set([main.replace(/[.。]$/,"").trim(),...alts])].filter(Boolean);
 }
 async function lookupOne(input){
-  const q=input.trim();
+  const q=input.trim().replace(/\s+/g," "), kind=kindOf(q);
+  const dictURL="https://api.dictionaryapi.dev/api/v2/entries/en/"+encodeURIComponent(q.toLowerCase());
   const [dict,ko]=await Promise.all([
-    getJSON("https://api.dictionaryapi.dev/api/v2/entries/en/"+encodeURIComponent(q.toLowerCase())).catch(()=>null),
+    kind==="sentence"?null:getJSON(dictURL).catch(()=>new Promise(r=>setTimeout(r,800)).then(()=>getJSON(dictURL)).catch(()=>null)),
     toKorean(q)
   ]);
-  const meaningKo=ko.filter(k=>k.toLowerCase()!==q.toLowerCase()&&!/[A-Za-z]{3,}/.test(k)).slice(0,3).join(", ");
+  const meaningKo=kind==="sentence"?(ko.find(k=>norm(k)!==norm(q))||"")
+    :ko.filter(k=>k.toLowerCase()!==q.toLowerCase()&&!/[A-Za-z]{3,}/.test(k)).slice(0,3).join(", ");
   const e=Array.isArray(dict)?dict:[];
   const phon=e.flatMap(x=>x.phonetics||[]);
   const usA=phon.find(p=>/-us[.]mp3$/i.test(p.audio||""));
@@ -457,7 +473,9 @@ async function lookupOne(input){
   const example=exObj?exObj.example.replace(/^./,c=>c.toUpperCase()).replace(/([^.!?])$/,"$1."):"";
   let exampleKo="";
   if(example){ try{ exampleKo=(await toKorean(example))[0]||""; }catch(err){} }
-  return {input:q,word:(e[0]&&e[0].word)||q.toLowerCase(),pos,meaning:meaningKo,def,example,exampleKo,phonetic,audio,valid:!!meaningKo};
+  let defKo="";
+  if(kind==="phrase"&&def){ try{ defKo=(await toKorean(def))[0]||""; }catch(err){} }
+  return {input:q,word:(e[0]&&e[0].word)||(kind==="word"?q.toLowerCase():q),pos,meaning:meaningKo,def,defKo,example,exampleKo,phonetic,audio,valid:!!meaningKo};
 }
 async function lookup(list){
   const out=new Array(list.length); let i=0, failed=null;
@@ -471,14 +489,14 @@ function lookupError(e){
   if(e.code==="translate") return "오늘 자동 번역 사용량을 다 썼어요. 뜻을 직접 입력해 주세요.";
   return "뜻을 찾지 못했어요. 다시 시도하거나 뜻을 직접 입력해 주세요.";
 }
-function newWord(o){ return {id:uid(),word:o.word,pos:o.pos||"",meaning:o.meaning,example:o.example||"",exampleKo:o.exampleKo||"",def:o.def||"",phonetic:o.phonetic||"",audio:o.audio||"",box:1,due:0,right:0,wrong:0,lookups:1,created:Date.now()}; }
+function newWord(o){ return {id:uid(),word:o.word,pos:o.pos||"",meaning:o.meaning,example:o.example||"",exampleKo:o.exampleKo||"",def:o.def||"",defKo:o.defKo||"",phonetic:o.phonetic||"",audio:o.audio||"",box:1,due:0,right:0,wrong:0,lookups:1,created:Date.now()}; }
 
 /* ---------- list tab ---------- */
 function listShell(){
   const v=$("#view");
   v.innerHTML=`<div class="stage">
     <form class="addform" id="addform" autocomplete="off">
-      <input class="field" id="f-word" placeholder="방금 모른 영어 단어" required autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+      <input class="field" id="f-word" placeholder="영어 단어 · 숙어 · 문장" required autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
       <button class="btn pri" type="submit" id="f-go">뜻 찾아서 저장</button>
     </form>
     <p class="dup-hint" id="dup-hint" hidden></p>
@@ -488,9 +506,9 @@ function listShell(){
       <input class="field" id="f-ex" placeholder="예문 (비워 두면 자동으로 만들어요)">
     </details>
     <details class="bulk" id="bulk">
-      <summary>여러 단어 한꺼번에 넣기</summary>
-      <textarea class="field" id="f-bulk" placeholder="한 줄에 한 단어씩&#10;abundant&#10;candid&#10;give up"></textarea>
-      <p class="hint">한 번에 30개까지 뜻과 예문을 찾아 저장해요.</p>
+      <summary>여러 개 한꺼번에 넣기</summary>
+      <textarea class="field" id="f-bulk" placeholder="한 줄에 하나씩&#10;abundant&#10;give up&#10;It's not my cup of tea."></textarea>
+      <p class="hint">한 줄에 단어·숙어·문장 하나씩, 한 번에 30개까지 뜻을 찾아 저장해요.</p>
       <div><button class="btn" id="bulk-go" type="button">뜻 찾아서 모두 저장</button></div>
     </details>
     <div id="banner"></div>
@@ -498,6 +516,9 @@ function listShell(){
       <input class="field grow" id="f-search" type="search" placeholder="단어나 뜻으로 찾기">
       <button class="btn chip" id="only-repeat" type="button"></button>
       <span id="filter-slot"></span>
+    </div>
+    <div class="seg" id="kind-seg" role="group" aria-label="종류">
+      <button type="button" data-kind="">전체</button><button type="button" data-kind="word">단어</button><button type="button" data-kind="phrase">숙어</button><button type="button" data-kind="sentence">문장</button>
     </div>
     <button class="btn wide" id="view-all" type="button">⛶ 전체 화면으로 넘겨 보기</button>
     <div class="list" id="list"></div></div>`;
@@ -507,7 +528,7 @@ function listShell(){
     const go=$("#f-go"), word=$("#f-word").value.trim(), meaning=$("#f-mean").value.trim(), example=$("#f-ex").value.trim();
     if(!word||go.disabled) return;
     const done=()=>{ $("#f-word").value=$("#f-mean").value=$("#f-ex").value=""; $("#dup-hint").hidden=true; $("#manual").open=false; $("#f-word").focus(); };
-    const again=o=>{ const n=meetAgain(o); if(example&&!o.example) patch(o,{example}); onlyRepeat=false; filterBox=0; query=""; $("#f-search").value=""; toast(`또 만난 단어예요! "${o.word}" ${n}번째 · 서랍 1로 돌아가요`); done(); renderListBody(); };
+    const again=o=>{ const n=meetAgain(o); if(example&&!o.example) patch(o,{example}); onlyRepeat=false; filterBox=0; query=""; $("#f-search").value=""; toast(`또 만난 ${KIND_KO[kindOf(o.word)]}예요! "${o.word}" ${n}번째 · 서랍 1로 돌아가요`); done(); renderListBody(); };
     const old=findByWord(word);
     if(old){ again(old); return; }
     if(meaning&&example){ put(newWord({word,meaning,example})); toast(`"${word}" 저장됨`); done(); return; }
@@ -531,8 +552,8 @@ function listShell(){
   };
   $("#bulk-go").onclick=async()=>{
     const b=$("#bulk-go");
-    const lines=[...new Set($("#f-bulk").value.split(/\n/).map(l=>l.split(/\t|,|:|\s-\s|=/)[0].trim()).filter(Boolean).map(s=>s.toLowerCase()))].slice(0,30);
-    if(!lines.length){ toast("한 줄에 한 단어씩 적어 주세요."); return; }
+    const lines=[...new Set($("#f-bulk").value.split(/\n/).map(l=>l.split(kindOf(l)==="sentence"?/\t|\s[-=]\s/:/\t|,|:|\s-\s|=/)[0].trim().replace(/\s+/g," ")).filter(Boolean).map(s=>kindOf(s)==="word"?s.toLowerCase():s))].slice(0,30);
+    if(!lines.length){ toast("한 줄에 하나씩 적어 주세요."); return; }
     const againIds=new Set(), ask=[];
     lines.forEach(l=>{ const o=findByWord(l); if(o){ if(!againIds.has(o.id)){againIds.add(o.id);meetAgain(o);} } else ask.push(l); });
     let added=0, bad=[];
@@ -557,6 +578,7 @@ function listShell(){
   };
   const s=$("#f-search"); s.value=query; s.oninput=()=>{ query=s.value; renderListBody(); };
   $("#only-repeat").onclick=()=>{onlyRepeat=!onlyRepeat;renderListBody()};
+  $("#kind-seg").onclick=e=>{ const b=e.target.closest("[data-kind]"); if(!b) return; kindFilter=b.dataset.kind; renderListBody(); };
   $("#view .stage").addEventListener("click",e=>{
     const sp=e.target.closest("[data-speak]"); if(sp){ speak(sp.dataset.speak); return; }
     if(e.target.closest("#view-all")){ const ids=visibleList().map(w=>w.id); if(ids.length) openViewer(ids,0); return; }
@@ -579,6 +601,7 @@ function visibleList(){
   if(filterBox) list=list.filter(w=>(w.box||1)===filterBox);
   if(query){ const q=query.toLowerCase(); list=list.filter(w=>(w.word+" "+w.meaning).toLowerCase().includes(q)); }
   if(onlyRepeat) list=list.filter(w=>seen(w)>=2);
+  if(kindFilter) list=list.filter(w=>kindOf(w.word)===kindFilter);
   return list.sort((a,b)=>(b.lastSeen||b.created||0)-(a.lastSeen||a.created||0));
 }
 function renderListBody(){
@@ -586,15 +609,17 @@ function renderListBody(){
   const list=visibleList();
   $("#view-all").disabled=!list.length;
   const repeatCount=all().filter(w=>seen(w)>=2).length;
+  const kc={word:0,phrase:0,sentence:0}; all().forEach(w=>kc[kindOf(w.word)]++);
+  document.querySelectorAll("#kind-seg [data-kind]").forEach(b=>{ const k=b.dataset.kind; b.setAttribute("aria-pressed",kindFilter===k); b.textContent=(k?KIND_KO[k]:"전체")+" "+(k?kc[k]:all().length); });
   const ch=$("#only-repeat"); ch.textContent=`또 나온 단어 ${repeatCount}`; ch.setAttribute("aria-pressed",onlyRepeat);
   $("#filter-slot").innerHTML=filterBox?`<button class="btn" id="clear-filter" type="button">서랍 ${filterBox} 필터 해제</button>`:"";
   $("#list").innerHTML=!loaded?`<div class="empty">불러오는 중…</div>`:list.length?list.map(w=>`
       <div class="item ${seen(w)>=2?"repeat":""} ${flashId===w.id?"flash":""}" data-open="${w.id}">
-        <div class="hw"><span class="w">${esc(w.word)}</span>${w.phonetic?`<span class="ipa">${esc(w.phonetic)}</span>`:""}${w.pos?`<span class="pos">${esc(w.pos)}</span>`:""}${seen(w)>=2?`<span class="again">${seen(w)}번째 만남</span>`:""}<button class="icon" data-speak="${esc(w.word)}" aria-label="${esc(w.word)} 발음 듣기">${speakIcon}</button><a class="dict" href="https://en.dict.naver.com/#/search?query=${encodeURIComponent(w.word)}" target="_blank" rel="noopener">사전</a></div>
-        <div class="mean">${esc(w.meaning)}${w.def?`<span class="def">${esc(w.def)}</span>`:""}</div>
+        <div class="hw"><span class="w${longCls(w)}">${esc(w.word)}</span>${kindTag(w)}${w.phonetic?`<span class="ipa">${esc(w.phonetic)}</span>`:""}${w.pos?`<span class="pos">${esc(w.pos)}</span>`:""}${seen(w)>=2?`<span class="again">${seen(w)}번째 만남</span>`:""}<button class="icon" data-speak="${esc(w.word)}" aria-label="${esc(w.word)} 발음 듣기">${speakIcon}</button><a class="dict" href="https://en.dict.naver.com/#/search?query=${encodeURIComponent(w.word)}" target="_blank" rel="noopener">사전</a></div>
+        <div class="mean">${esc(w.meaning)}${w.defKo?`<span class="def">풀이: ${esc(w.defKo)}</span>`:""}${w.def?`<span class="def">${esc(w.def)}</span>`:""}</div>
         ${w.example?`<div class="exs">${esc(w.example)}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`:""}
         <div class="side"><span class="pill">서랍 ${w.box||1}</span>${pill(w)}${w.sample?"":`<button class="del ${armedDel===w.id?"arm":""}" data-del="${w.id}">${armedDel===w.id?"정말 삭제":"삭제"}</button>`}</div>
-      </div>`).join(""):`<div class="empty">${query||filterBox||onlyRepeat?"조건에 맞는 단어가 없어요.":"아직 단어가 없어요. 위에 모르는 영어 단어를 적고 저장해 보세요."}</div>`;
+      </div>`).join(""):`<div class="empty">${query||filterBox||onlyRepeat||kindFilter?"조건에 맞는 항목이 없어요.":"아직 저장한 게 없어요. 위에 모르는 영어 단어나 숙어, 문장을 적고 저장해 보세요."}</div>`;
   const fl=$("#list .item.flash"); if(fl){ fl.scrollIntoView({block:"nearest"}); setTimeout(()=>{flashId=null},1600); }
 }
 
@@ -639,7 +664,7 @@ function renderCards(){
     <div class="bar"><i style="width:${pct}%"></i></div>
     <div class="card ${session.flip?"flip":""}" id="card" tabindex="0" role="button" aria-label="카드 뒤집기">
       <div class="card-in">
-        <div class="face front"><span class="boxno">서랍 ${w.box||1}</span>${seen(w)>=2?`<span class="again card-again">${seen(w)}번째 만남</span>`:""}<div class="big">${esc(w.word)}</div>
+        <div class="face front"><span class="boxno">서랍 ${w.box||1}</span>${seen(w)>=2?`<span class="again card-again">${seen(w)}번째 만남</span>`:""}<div class="big${longCls(w)}">${esc(w.word)}</div>${kindTag(w)}
           <button class="icon" id="cspeak" aria-label="발음 듣기">${speakIcon}</button><span class="tip">눌러서 뜻 보기 · Space</span></div>
         <div class="face back"><span class="boxno">서랍 ${w.box||1}</span><div class="big" style="font-size:1.6rem">${esc(w.word)}</div>${w.phonetic?`<div class="ipa">${esc(w.phonetic)}</div>`:""}<div class="m">${esc(w.meaning)}</div>${w.pos?`<div class="pos">${esc(w.pos)}</div>`:""}${w.example?`<div class="e">${esc(w.example)}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`:""}</div>
       </div>
@@ -669,7 +694,8 @@ function newQuiz(){
   const qs=shuffle(list).slice(0,QUIZ_N).map(w=>{
     const types=["en","ko"]; if(blankOf(w)) types.push("blank","blank");
     const type=types[Math.random()*types.length|0];
-    const others=shuffle(list.filter(o=>o.id!==w.id&&o.meaning!==w.meaning)).slice(0,3);
+    const k=kindOf(w.word), pool=shuffle(list.filter(o=>o.id!==w.id&&o.meaning!==w.meaning));
+    const others=[...pool.filter(o=>kindOf(o.word)===k),...pool.filter(o=>kindOf(o.word)!==k)].slice(0,3);
     return {id:w.id,type,opts:shuffle([w,...others]).map(o=>o.id),picked:null};
   });
   quiz={qs,i:0,score:0,missed:[]};
@@ -691,7 +717,7 @@ function renderQuiz(){
   const q=quiz.qs[quiz.i], w=findWord(q.id);
   if(!w){ quiz.i++; renderQuiz(); return; }
   const showEn=q.type!=="en";
-  const prompt=q.type==="en"?`<div class="q-word">${esc(w.word)}</div>`
+  const prompt=q.type==="en"?`<div class="q-word${longCls(w)}">${esc(w.word)}</div>`
     :q.type==="ko"?`<div class="q-word ko">${esc(w.meaning)}</div>`
     :`<div class="q-sent">${esc(blankOf(w)).replace("_____",'<span class="gap">_____</span>')}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`;
   v.innerHTML=`<div class="stage">
@@ -737,11 +763,11 @@ function drawViewer(){
   $("#v-count").textContent=(viewer.i+1)+" / "+n;
   $("#v-prev").disabled=viewer.i===0; $("#v-next").disabled=viewer.i===n-1;
   $("#v-track").innerHTML=`<div class="v-card ${seen(w)>=2?"repeat":""}" id="v-card">
-    <div class="v-word">${esc(w.word)}</div>
-    <div class="v-meta">${w.phonetic?`<span class="ipa">${esc(w.phonetic)}</span>`:""}${w.pos?`<span class="pos">${esc(w.pos)}</span>`:""}${seen(w)>=2?`<span class="again">${seen(w)}번째 만남</span>`:""}<span class="pill">서랍 ${w.box||1}</span></div>
+    <div class="v-word${longCls(w)}">${esc(w.word)}</div>
+    <div class="v-meta">${kindTag(w)}${w.phonetic?`<span class="ipa">${esc(w.phonetic)}</span>`:""}${w.pos?`<span class="pos">${esc(w.pos)}</span>`:""}${seen(w)>=2?`<span class="again">${seen(w)}번째 만남</span>`:""}<span class="pill">서랍 ${w.box||1}</span></div>
     <button class="v-say" type="button" data-speak="${esc(w.word)}">${speakIcon} 발음 듣기</button>
     <div class="v-mean">${esc(w.meaning)}</div>
-    ${w.def?`<div class="v-def">${esc(w.def)}</div>`:""}
+    ${w.defKo?`<div class="v-def">풀이: ${esc(w.defKo)}</div>`:""}${w.def?`<div class="v-def">${esc(w.def)}</div>`:""}
     ${w.example?`<div class="v-ex">${esc(w.example)}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`:""}
   </div>`;
 }
