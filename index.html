@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#18233A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="단어 서랍">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>단어 서랍</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: a single study column; header holds the five Leitner drawers as the page's signature, tabs switch between list, cards and quiz. */
+:root{
+  --bg:#EDF0F4; --surface:#FFFFFF; --ink:#18233A; --muted:#5D6879; --line:#D6DCE4;
+  --primary:#2B4C9B; --primary-ink:#FFFFFF; --mark:#F5CB3A; --mark-ink:#18233A;
+  --good:#2C8556; --good-bg:#E3F3EA; --bad:#BF3F37; --bad-bg:#FBE7E5; --soft:#E4E9F1;
+  --f-head:"DM Serif Display",Georgia,"Times New Roman",serif;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#10151F; --surface:#182031; --ink:#E7EBF2; --muted:#98A3B6; --line:#2A3447;
+  --primary:#8AA6F0; --primary-ink:#0F1626; --mark:#E2B52A; --mark-ink:#141A26;
+  --good:#5CC48A; --good-bg:#16301F; --bad:#F07A70; --bad-bg:#3A1C1A; --soft:#212B3E; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151F; --surface:#182031; --ink:#E7EBF2; --muted:#98A3B6; --line:#2A3447;
+  --primary:#8AA6F0; --primary-ink:#0F1626; --mark:#E2B52A; --mark-ink:#141A26;
+  --good:#5CC48A; --good-bg:#16301F; --bad:#F07A70; --bad-bg:#3A1C1A; --soft:#212B3E; color-scheme:dark}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;-webkit-text-size-adjust:100%}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55}
+.wrap{max-width:760px;margin:0 auto;padding:28px 16px 64px;display:flex;flex-direction:column;gap:22px}
+h1{font-family:var(--f-head);font-weight:400;font-size:2.4rem;line-height:1.05;margin:0;letter-spacing:-.01em}
+h1 em{font-style:normal;background:linear-gradient(transparent 58%,var(--mark) 58%,var(--mark) 92%,transparent 92%);padding:0 .1em}
+.sub{color:var(--muted);margin:6px 0 0}
+.top{display:flex;flex-direction:column;gap:18px}
+.status{font-size:.82rem;color:var(--muted)}
+/* drawers */
+.drawers{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.drawer{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 10px 8px;display:flex;flex-direction:column;gap:2px;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.drawer:hover{border-color:var(--primary)}
+.drawer[aria-pressed="true"]{border-color:var(--primary);box-shadow:inset 0 -3px 0 var(--primary)}
+.drawer .lab{font-family:var(--f-mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.drawer .n{font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.drawer .iv{font-size:.74rem;color:var(--muted)}
+.summary{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.88rem;color:var(--muted)}
+.summary b{color:var(--ink);font-variant-numeric:tabular-nums}
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tab{background:none;border:0;font:inherit;font-weight:600;color:var(--muted);padding:10px 14px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.tab .cnt{font-family:var(--f-mono);font-size:.72rem;background:var(--mark);color:var(--mark-ink);border-radius:9px;padding:1px 6px;margin-left:5px}
+/* controls */
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:8px 14px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--ink)}
+.btn.pri{background:var(--primary);border-color:var(--primary);color:var(--primary-ink)}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.field{border:1px solid var(--line);background:var(--surface);border-radius:6px;padding:9px 11px;width:100%;min-width:0}
+.field::placeholder{color:var(--muted)}
+.addform{display:grid;grid-template-columns:1fr 1fr auto;gap:8px}
+.addform .ex{grid-column:1 / 3}
+@media (max-width:560px){.addform{grid-template-columns:1fr}.addform .ex{grid-column:auto}}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.grow{flex:1 1 200px;min-width:0}
+details.bulk{font-size:.9rem}
+details.bulk summary{cursor:pointer;color:var(--muted)}
+details.bulk[open]{display:flex;flex-direction:column;gap:8px}
+details.bulk textarea{min-height:110px;resize:vertical;font-family:var(--f-mono);font-size:.85rem}
+.hint{font-size:.82rem;color:var(--muted);margin:0}
+.banner{background:var(--soft);border-radius:6px;padding:12px 14px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-size:.9rem}
+/* list */
+.list{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+.item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:14px 16px;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.hw{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;min-width:0}
+.hw .w{font-family:var(--f-head);font-size:1.35rem;line-height:1.2;overflow-wrap:anywhere}
+.mean{grid-column:1;min-width:0}
+.exs{grid-column:1;color:var(--muted);font-style:italic;font-size:.9rem;min-width:0;overflow-wrap:anywhere}
+.side{grid-row:1 / span 3;grid-column:2;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.pill{font-family:var(--f-mono);font-size:.7rem;padding:2px 8px;border-radius:10px;background:var(--soft);color:var(--muted);white-space:nowrap}
+.pill.due{background:var(--mark);color:var(--mark-ink)}
+.pill.done{background:var(--good-bg);color:var(--good)}
+.icon{background:none;border:0;padding:4px;cursor:pointer;color:var(--muted);border-radius:4px;line-height:0}
+.icon:hover{color:var(--ink);background:var(--soft)}
+.del{background:none;border:0;cursor:pointer;color:var(--muted);font-size:.8rem;padding:2px 4px}
+.del:hover,.del.arm{color:var(--bad)}
+.item.repeat .w{background:linear-gradient(transparent 55%,var(--mark) 55%,var(--mark) 90%,transparent 90%)}
+.again{font-size:.72rem;font-weight:700;color:var(--bad);border:1.5px solid var(--bad);border-radius:4px;padding:0 6px;white-space:nowrap;align-self:center}
+.card-again{position:absolute;top:10px;right:14px}
+.item.flash{animation:flash 1.6s ease-out}
+@keyframes flash{0%,30%{background:var(--soft)}100%{background:transparent}}
+.dup-hint{margin:-8px 0 0;font-size:.88rem;background:var(--bad-bg);color:var(--ink);border-radius:6px;padding:9px 12px}
+.dup-hint b{color:var(--bad)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+@media (prefers-reduced-motion:reduce){.item.flash{animation:none}}
+.pos{font-size:.72rem;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 6px;white-space:nowrap;align-self:center}
+.exko{display:block;font-style:normal;font-size:.85rem;margin-top:2px}
+details.bulk#manual[open]{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+details.bulk#manual summary{grid-column:1 / -1}
+@media (max-width:560px){details.bulk#manual[open]{grid-template-columns:1fr}}
+.addform{grid-template-columns:1fr auto}
+@media (max-width:560px){.addform{grid-template-columns:1fr}}
+.q-sent{font-size:1.25rem;line-height:1.6;text-align:center;padding:22px 8px 6px;max-width:40ch;margin:0 auto;overflow-wrap:anywhere}
+.q-sent .gap{color:var(--primary);font-weight:700;letter-spacing:.05em}
+.q-sent .exko{color:var(--muted);font-size:.9rem;margin-top:8px}
+.qtype{color:var(--ink);font-weight:600}
+.missed{display:flex;flex-direction:column;gap:4px;text-align:left;font-size:.92rem;background:var(--bad-bg);border-radius:6px;padding:10px 14px;max-width:100%}
+.missed b{font-family:var(--f-head);font-weight:400;font-size:1.05rem;margin-right:6px}
+.voicebox{font-size:.88rem}
+.voicebox summary{cursor:pointer;color:var(--muted)}
+.voicebox[open]{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:10px 12px}
+.voicebox .warn{color:var(--bad);font-weight:600}
+.voicebox .hint{line-height:1.7}
+.dict{font-size:.75rem;color:var(--primary);text-decoration:none;align-self:center;padding:2px 4px}
+.dict:hover{text-decoration:underline}
+.ipa{font-family:var(--f-mono);font-size:.78rem;color:var(--muted);align-self:center}
+.def{display:block;font-size:.82rem;color:var(--muted);margin-top:1px}
+label.btn{display:inline-flex;align-items:center}
+.empty{padding:28px 16px;text-align:center;color:var(--muted)}
+/* card */
+.stage{display:flex;flex-direction:column;gap:16px;align-items:stretch}
+.prog{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.bar{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--primary);transition:width .25s}
+.card{perspective:1200px;height:300px;cursor:pointer}
+.card-in{position:relative;width:100%;height:100%;transition:transform .45s;transform-style:preserve-3d}
+.card.flip .card-in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;background:var(--surface);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;
+  background-image:repeating-linear-gradient(var(--surface) 0 31px,var(--soft) 31px 32px);background-position:0 70px}
+.face.back{transform:rotateY(180deg)}
+.face .big{font-family:var(--f-head);font-size:clamp(2rem,7vw,3rem);line-height:1.1;overflow-wrap:anywhere}
+.face .m{font-size:1.3rem;font-weight:600}
+.face .e{color:var(--muted);font-style:italic;max-width:46ch}
+.face .tip{position:absolute;bottom:12px;font-size:.78rem;color:var(--muted)}
+.face .boxno{position:absolute;top:12px;left:14px;font-family:var(--f-mono);font-size:.72rem;color:var(--muted)}
+.answer{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn.no{background:var(--bad-bg);border-color:transparent;color:var(--bad);padding:12px}
+.btn.yes{background:var(--good-bg);border-color:transparent;color:var(--good);padding:12px}
+.kbd{font-family:var(--f-mono);font-size:.7rem;opacity:.7;margin-left:6px}
+.done-box{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:32px 20px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center}
+.done-box h2{font-family:var(--f-head);font-weight:400;font-size:1.8rem;margin:0}
+/* quiz */
+.q-word{font-family:var(--f-head);font-size:clamp(1.8rem,6vw,2.6rem);text-align:center;padding:26px 12px 10px;overflow-wrap:anywhere}
+.q-word.ko{font-family:var(--f-body);font-weight:700;font-size:1.5rem}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.choices{grid-template-columns:1fr}}
+.choice{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;text-align:left;cursor:pointer;font-weight:500;min-width:0;overflow-wrap:anywhere}
+.choice:hover:not(:disabled){border-color:var(--primary)}
+.choice.en{font-family:var(--f-head);font-size:1.2rem;font-weight:400}
+.choice.right{background:var(--good-bg);border-color:var(--good);color:var(--good)}
+.choice.wrong{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.choice:disabled{cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:var(--surface);padding:6px 12px;cursor:pointer;font-size:.85rem}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:6px;font-size:.88rem;max-width:calc(100% - 32px)}
+@media (max-width:520px){
+  .wrap{padding-block:18px 48px;gap:18px} h1{font-size:2rem}
+  .tab{flex:1;padding:12px 6px} .card{height:260px}
+  .drawer{padding:8px 6px} .drawer .n{font-size:1.25rem} .drawer .iv{font-size:.68rem}
+  .field,.btn{min-height:44px} .icon{padding:8px}
+}
+@media (prefers-reduced-motion:reduce){.card-in,.bar i{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>단어 <em>서랍</em></h1>
+      <p class="sub">외운 단어는 다음 서랍으로, 헷갈린 단어는 첫 서랍으로. 서랍이 뒤로 갈수록 복습 간격이 길어져요.</p>
+    </div>
+    <div class="drawers" id="drawers"></div>
+    <div class="summary" id="summary"></div>
+    <div class="status" id="status">단어장을 불러오는 중…</div>
+    <details class="voicebox" id="voicebox">
+      <summary>발음 설정 <span id="voice-now"></span></summary>
+      <div class="row">
+        <select class="field grow" id="voice-sel" aria-label="발음 목소리"></select>
+        <button class="btn" id="voice-test" type="button">들어 보기</button>
+      </div>
+      <div class="hint" id="voice-help"></div>
+    </details>
+    <details class="voicebox" id="backupbox">
+      <summary>백업 · 다른 기기로 옮기기</summary>
+      <div class="hint">단어는 이 기기의 브라우저 안에 저장돼요. 다른 기기로 옮기거나 혹시 모를 삭제에 대비하려면 백업 파일을 저장해 두세요.</div>
+      <div class="row">
+        <button class="btn" id="bk-export" type="button">백업 파일 저장</button>
+        <label class="btn" for="bk-file">백업 파일 불러오기</label>
+        <input type="file" id="bk-file" accept="application/json,.json" hidden>
+      </div>
+    </details>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tab-list" data-tab="list">단어장</button>
+    <button class="tab" role="tab" id="tab-cards" data-tab="cards">카드 복습</button>
+    <button class="tab" role="tab" id="tab-quiz" data-tab="quiz">랜덤 퀴즈</button>
+  </nav>
+
+  <main id="view"></main>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const SAMPLES=[
+ ["ephemeral","덧없는, 순식간의","Fame in the age of social media is often ephemeral."],
+ ["meticulous","꼼꼼한, 세심한","She kept meticulous notes during every meeting."],
+ ["resilient","회복력 있는","Children are often more resilient than adults expect."],
+ ["ambiguous","애매한, 모호한","The ending of the movie was deliberately ambiguous."],
+ ["diligent","부지런한, 성실한","A diligent student reviews new words every day."],
+ ["abundant","풍부한","The region has abundant fresh water."],
+ ["reluctant","꺼리는, 마지못한","He was reluctant to admit his mistake."],
+ ["inevitable","불가피한","Some delays are inevitable in a project this size."],
+ ["candid","솔직한","Thank you for your candid feedback."],
+ ["scrutinize","면밀히 조사하다","Investors will scrutinize the company's report."],
+ ["mitigate","완화하다","Planting trees can mitigate the effects of heat."],
+ ["profound","깊은, 심오한","The book had a profound effect on me."],
+ ["tedious","지루한, 싫증 나는","Filling out the forms was tedious work."],
+ ["vivid","생생한","I still have a vivid memory of that day."],
+ ["feasible","실현 가능한","Is it feasible to finish by Friday?"],
+ ["compelling","설득력 있는, 강렬한","She made a compelling argument for the plan."],
+ ["frugal","검소한, 절약하는","They live a frugal life to save for a house."],
+ ["obsolete","구식의, 더 이상 쓰이지 않는","Fax machines are almost obsolete."],
+ ["persevere","인내하다, 끝까지 해내다","If you persevere, your English will improve."],
+ ["versatile","다재다능한, 다용도의","A versatile actor can play any role."]
+];
+const BOX_LABEL=["","새 단어","익히는 중","거의 앎","복습만","외움"];
+const BOX_DAYS=[0,0,1,3,7,14];
+const DAY=86400000, LSKEY="word-drawer.v1";
+
+let words=new Map(), loaded=false, backend="none", coll=null;
+let tab="list", filterBox=0, query="", armedDel=null, onlyRepeat=false, flashId=null;
+const seen=w=>w.lookups||1;
+const findByWord=t=>[...words.values()].find(w=>w.word.toLowerCase()===t.toLowerCase());
+function meetAgain(w,newMeaning){
+  const n=seen(w)+1, p={lookups:n,box:1,due:0,lastSeen:Date.now()};
+  if(newMeaning&&!w.meaning.includes(newMeaning)) p.meaning=w.meaning+", "+newMeaning;
+  patch(w,p); flashId=w.id; return n;
+}
+let session=null, quiz=null, quizDir="en";
+try{ tab=localStorage.getItem(LSKEY+".tab")||"list"; }catch(e){}
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const startOfToday=()=>{const d=new Date();d.setHours(0,0,0,0);return d.getTime()};
+const isDue=w=>(w.due||0)<=Date.now();
+
+const sampleWords=SAMPLES.map(([word,meaning,example],i)=>({id:"s"+i,word,meaning,example,box:1,due:0,right:0,wrong:0,created:i,sample:true}));
+function all(){ const real=[...words.values()]; return (loaded&&real.length===0)?sampleWords:real; }
+const usingSamples=()=>loaded&&words.size===0;
+
+function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,2200)}
+function setStatus(msg){$("#status").textContent=msg}
+$("#bk-export").onclick=exportBackup;
+$("#bk-file").onchange=e=>{ const f=e.target.files[0]; if(f) importBackup(f); e.target.value=""; };
+
+/* ---------- storage ---------- */
+function saveLocal(){ if(backend!=="local")return; try{localStorage.setItem(LSKEY,JSON.stringify([...words.values()]))}catch(e){} }
+function useLocal(note){
+  backend="local";
+  try{ (JSON.parse(localStorage.getItem(LSKEY)||"[]")).forEach(w=>words.set(w.id,w)); }catch(e){}
+  loaded=true; setStatus(note||"이 브라우저에 저장돼요."); render();
+}
+function clean(w){const o={...w};delete o.id;delete o.sample;return o}
+async function put(w){
+  if(backend==="db"){ try{ await coll.doc(w.id).set(clean(w)); }catch(e){ toast(e.code==="quota_exceeded"?"저장 공간이 가득 찼어요. 단어 몇 개를 지워 주세요.":"저장하지 못했어요. 잠시 후 다시 시도해 주세요."); } }
+  else { words.set(w.id,w); saveLocal(); render(); }
+}
+async function patch(w,p){
+  Object.assign(w,p);
+  if(w.sample){ render(); return; }
+  if(backend==="db"){ try{ await coll.doc(w.id).update(p); }catch(e){ toast("기록을 저장하지 못했어요."); } }
+  else { saveLocal(); render(); }
+}
+async function remove(id){
+  if(backend==="db"){ try{ await coll.doc(id).delete(); }catch(e){ toast("삭제하지 못했어요."); } }
+  else { words.delete(id); saveLocal(); render(); }
+}
+
+async function init(){
+  render();
+  try{ navigator.storage&&navigator.storage.persist&&navigator.storage.persist(); }catch(e){}
+  useLocal("이 기기 브라우저에 저장돼요. 다른 기기로 옮기려면 위 백업을 쓰세요.");
+}
+function exportBackup(){
+  const data=JSON.stringify({app:"word-drawer",version:1,exported:new Date().toISOString(),words:[...words.values()]},null,1);
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([data],{type:"application/json"}));
+  const d=new Date(); a.download="단어서랍-백업-"+d.getFullYear()+String(d.getMonth()+1).padStart(2,"0")+String(d.getDate()).padStart(2,"0")+".json";
+  document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
+  toast("단어 "+words.size+"개를 백업 파일로 저장했어요");
+}
+async function importBackup(file){
+  try{
+    const j=JSON.parse(await file.text()); const list=Array.isArray(j)?j:j.words;
+    if(!Array.isArray(list)) throw 0;
+    let added=0, merged=0;
+    list.forEach(w=>{
+      if(!w||!w.word||!w.meaning) return;
+      const o=findByWord(w.word);
+      if(o){ o.lookups=Math.max(seen(o),w.lookups||1); o.right=Math.max(o.right||0,w.right||0); o.wrong=Math.max(o.wrong||0,w.wrong||0); merged++; }
+      else { const id=w.id&&!words.has(w.id)?w.id:uid(); words.set(id,{...w,id}); added++; }
+    });
+    saveLocal(); render(); toast("새 단어 "+added+"개 추가 · 겹친 단어 "+merged+"개 합침");
+  }catch(e){ toast("백업 파일을 읽지 못했어요. 이 앱에서 저장한 .json 파일인지 확인해 주세요."); }
+}
+
+/* ---------- header ---------- */
+function renderHeader(){
+  const list=all(), counts=[0,0,0,0,0,0];
+  list.forEach(w=>counts[Math.min(5,Math.max(1,w.box||1))]++);
+  $("#drawers").innerHTML=[1,2,3,4,5].map(b=>`
+    <button class="drawer" data-box="${b}" aria-pressed="${filterBox===b}" title="${b}번 서랍 단어만 보기">
+      <span class="lab">서랍 ${b}</span><span class="n">${counts[b]}</span>
+      <span class="iv">${b===1?"매일":b===5?BOX_DAYS[b]+"일마다":BOX_DAYS[b]+"일 뒤"}</span>
+    </button>`).join("");
+  const due=list.filter(isDue).length, tot=list.reduce((a,w)=>a+(w.right||0)+(w.wrong||0),0), ok=list.reduce((a,w)=>a+(w.right||0),0);
+  $("#summary").innerHTML=`<span>전체 <b>${list.length}</b>개</span><span>오늘 복습 <b>${due}</b>개</span><span>정답률 <b>${tot?Math.round(ok/tot*100)+"%":"–"}</b></span>${usingSamples()?'<span>예시 단어 표시 중</span>':""}`;
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.setAttribute("aria-selected",t.dataset.tab===tab);
+    if(t.dataset.tab==="cards") t.innerHTML=`카드 복습${due?`<span class="cnt">${due}</span>`:""}`;
+  });
+}
+
+/* ---------- list tab ---------- */
+const speakIcon='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z" fill="currentColor" stroke="none"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>';
+/* Voice: user choice first, then a preferred en-US voice, then any English voice. Never a non-English voice. */
+const US_PREF=["Samantha","Ava","Allison","Susan","Zoe","Nicky","Alex","Google US English","English United States","Microsoft Aria","Microsoft Jenny","Microsoft Guy","Microsoft Zira","Microsoft David","English (United States)"];
+let usVoice=null, enVoices=[];
+const isUS=v=>/^en[-_]US$/i.test(v.lang);
+function pickVoice(){
+  try{
+    enVoices=speechSynthesis.getVoices().filter(v=>/^en([-_]|$)/i.test(v.lang));
+    let saved=null; try{ saved=localStorage.getItem(LSKEY+".voice"); }catch(e){}
+    const score=v=>{ const i=US_PREF.findIndex(p=>v.name.includes(p)); return (isUS(v)?0:1000)+(i<0?100:i)-(/enhanced|premium|natural|online|neural/i.test(v.name)?50:0); };
+    enVoices.sort((x,y)=>score(x)-score(y));
+    usVoice=enVoices.find(v=>v.voiceURI===saved)||enVoices[0]||null;
+  }catch(e){ enVoices=[]; usVoice=null; }
+  renderVoiceBox();
+}
+function renderVoiceBox(){
+  const sel=$("#voice-sel"); if(!sel) return;
+  const help=$("#voice-help"), now=$("#voice-now");
+  sel.innerHTML=enVoices.map(v=>`<option value="${esc(v.voiceURI)}" ${usVoice&&v.voiceURI===usVoice.voiceURI?"selected":""}>${esc(v.name)} · ${isUS(v)?"미국":v.lang.replace(/^en[-_]/i,"")}</option>`).join("");
+  sel.hidden=!enVoices.length; $("#voice-test").hidden=!enVoices.length;
+  if(!enVoices.length){
+    now.textContent="· 영어 목소리 없음"; now.className="warn";
+    help.innerHTML=`이 기기(또는 지금 쓰는 앱)에서 영어 목소리를 찾지 못해서 한국어 목소리로 읽히고 있어요.<br>
+      <b>1.</b> Claude 앱 안에서 보고 있다면 이 링크를 <b>Chrome</b>에서 열어 보세요.<br>
+      <b>2.</b> Android: 설정 → 일반(또는 접근성) → 텍스트 음성 변환(TTS) → 기본 엔진을 <b>Google 음성 인식 및 합성</b>으로 → 톱니바퀴 → 음성 데이터 설치 → <b>English (United States)</b> 다운로드<br>
+      <b>3.</b> iPhone: 설정 → 손쉬운 사용 → 콘텐츠 말하기 → 음성 → 영어 → 미국 목소리 다운로드<br>
+      그동안은 단어 옆 <b>사전</b> 링크에서 미국 발음을 들을 수 있어요.`;
+  }else{
+    now.textContent="· "+usVoice.name+(isUS(usVoice)?"":" (미국 목소리 아님)"); now.className=isUS(usVoice)?"":"warn";
+    help.textContent=enVoices.some(isUS)?"목록 위쪽일수록 자연스러운 미국 목소리예요. 마음에 드는 목소리를 골라 들어 보세요.":"미국 목소리가 없어 다른 영어 목소리를 쓰고 있어요. 기기 설정에서 English (United States) 음성을 내려받으면 목록에 나타나요.";
+  }
+}
+try{ speechSynthesis.addEventListener("voiceschanged",pickVoice); }catch(e){}
+setTimeout(pickVoice,0); setTimeout(pickVoice,1500);
+$("#voice-sel").onchange=e=>{ usVoice=enVoices.find(v=>v.voiceURI===e.target.value)||usVoice; try{localStorage.setItem(LSKEY+".voice",usVoice.voiceURI)}catch(err){} renderVoiceBox(); speak("Hello, this is how words will sound."); };
+$("#voice-test").onclick=()=>speak("Hello, this is how words will sound.");
+let audioEl=null;
+function tts(text){
+  try{
+    if(!usVoice) pickVoice();
+    if(!usVoice){ toast("이 기기에 영어 목소리가 없어요. 위쪽 발음 설정을 확인해 주세요."); $("#voicebox").open=true; }
+    const u=new SpeechSynthesisUtterance(text); u.lang=usVoice?usVoice.lang:"en-US"; u.rate=.9;
+    if(usVoice) u.voice=usVoice;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  }catch(e){ toast("이 브라우저에서는 발음 듣기를 쓸 수 없어요."); }
+}
+function speak(text){
+  const w=findByWord(text);
+  if(w&&w.audio){
+    try{ if(audioEl) audioEl.pause(); audioEl=new Audio(w.audio); audioEl.play().catch(()=>tts(text)); return; }catch(e){}
+  }
+  tts(text);
+}
+function pill(w){
+  const b=w.box||1;
+  if(isDue(w)) return `<span class="pill due">복습할 때</span>`;
+  if(b===5) return `<span class="pill done">외움</span>`;
+  const d=Math.ceil(((w.due||0)-startOfToday())/DAY);
+  return `<span class="pill">${d<=1?"내일":d+"일 뒤"}</span>`;
+}
+/* ---------- word lookup (Claude) ---------- */
+let ai=null, aiOff=false;
+const POS_KO={noun:"명사",verb:"동사",adjective:"형용사",adverb:"부사",preposition:"전치사",conjunction:"접속사",pronoun:"대명사",interjection:"감탄사",determiner:"한정사",exclamation:"감탄사"};
+async function getJSON(url,ms=9000){
+  const c=new AbortController(), t=setTimeout(()=>c.abort(),ms);
+  try{ const r=await fetch(url,{signal:c.signal}); if(r.status===404) return null; if(!r.ok) throw {code:"http"}; return await r.json(); }
+  catch(e){ throw e&&e.code?e:{code:"network"}; }
+  finally{ clearTimeout(t); }
+}
+async function toKorean(text){
+  try{
+    const g=await getJSON("https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&dt=bd&q="+encodeURIComponent(text));
+    const t=((g&&g[0])||[]).map(x=>x[0]).join("").trim();
+    const bd=((g&&g[1])||[]).flatMap(p=>(p[1]||[]).slice(0,3));
+    const list=[...new Set([t,...bd].map(x=>(x||"").replace(/[.。]$/,"").trim()).filter(Boolean))];
+    if(list.length) return list;
+  }catch(e){ if(e.code==="network"&&!navigator.onLine) throw e; }
+  return toKoreanMM(text);
+}
+async function toKoreanMM(text){
+  const j=await getJSON("https://api.mymemory.translated.net/get?langpair=en%7Cko&q="+encodeURIComponent(text));
+  const main=(j&&j.responseData&&j.responseData.translatedText)||"";
+  if(!main||/MYMEMORY|QUERY LENGTH|INVALID/i.test(main)) throw {code:"translate"};
+  const alts=(j.matches||[]).filter(m=>Number(m.quality)>=70&&m.translation&&m.translation.length<=20&&!/[A-Za-z]{2,}/.test(m.translation)).map(m=>m.translation.replace(/[.。]$/,"").trim());
+  return [...new Set([main.replace(/[.。]$/,"").trim(),...alts])].filter(Boolean);
+}
+async function lookupOne(input){
+  const q=input.trim();
+  const [dict,ko]=await Promise.all([
+    getJSON("https://api.dictionaryapi.dev/api/v2/entries/en/"+encodeURIComponent(q.toLowerCase())).catch(()=>null),
+    toKorean(q)
+  ]);
+  const meaningKo=ko.filter(k=>k.toLowerCase()!==q.toLowerCase()&&!/[A-Za-z]{3,}/.test(k)).slice(0,3).join(", ");
+  const e=Array.isArray(dict)?dict:[];
+  const phon=e.flatMap(x=>x.phonetics||[]);
+  const usA=phon.find(p=>/-us[.]mp3$/i.test(p.audio||""));
+  const raw=((usA||phon.find(p=>p.audio&&!/-(uk|au|ca|ie|nz)[.]mp3$/i.test(p.audio))||{}).audio)||"";
+  const audio=raw.startsWith("//")?"https:"+raw:raw;
+  const phonetic=((usA&&usA.text?usA:phon.find(p=>p.text))||{}).text||(e[0]&&e[0].phonetic)||"";
+  const means=e.flatMap(x=>x.meanings||[]);
+  const pos=[...new Set(means.map(m=>POS_KO[m.partOfSpeech]||"").filter(Boolean))].slice(0,2).join("·");
+  const defs=means.flatMap(m=>m.definitions||[]);
+  const def=(defs[0]&&defs[0].definition)||"";
+  const exObj=defs.find(d=>d.example&&d.example.split(" ").length>=4)||defs.find(d=>d.example);
+  const example=exObj?exObj.example.replace(/^./,c=>c.toUpperCase()).replace(/([^.!?])$/,"$1."):"";
+  let exampleKo="";
+  if(example){ try{ exampleKo=(await toKorean(example))[0]||""; }catch(err){} }
+  return {input:q,word:(e[0]&&e[0].word)||q.toLowerCase(),pos,meaning:meaningKo,def,example,exampleKo,phonetic,audio,valid:!!meaningKo};
+}
+async function lookup(list){
+  const out=new Array(list.length); let i=0, failed=null;
+  async function worker(){ while(i<list.length){ const k=i++; try{ out[k]=await lookupOne(list[k]); }catch(e){ failed=e; out[k]={input:list[k],valid:false}; } } }
+  await Promise.all([worker(),worker(),worker()]);
+  if(failed&&out.every(r=>!r.valid)) throw failed;
+  return out;
+}
+function lookupError(e){
+  if(e.code==="network") return "인터넷에 연결되지 않았어요. 연결을 확인하거나 뜻을 직접 입력해 주세요.";
+  if(e.code==="translate") return "오늘 자동 번역 사용량을 다 썼어요. 뜻을 직접 입력해 주세요.";
+  return "뜻을 찾지 못했어요. 다시 시도하거나 뜻을 직접 입력해 주세요.";
+}
+function newWord(o){ return {id:uid(),word:o.word,pos:o.pos||"",meaning:o.meaning,example:o.example||"",exampleKo:o.exampleKo||"",def:o.def||"",phonetic:o.phonetic||"",audio:o.audio||"",box:1,due:0,right:0,wrong:0,lookups:1,created:Date.now()}; }
+
+/* ---------- list tab ---------- */
+function listShell(){
+  const v=$("#view");
+  v.innerHTML=`<div class="stage">
+    <form class="addform" id="addform" autocomplete="off">
+      <input class="field" id="f-word" placeholder="방금 모른 영어 단어" required autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done">
+      <button class="btn pri" type="submit" id="f-go">뜻 찾아서 저장</button>
+    </form>
+    <p class="dup-hint" id="dup-hint" hidden></p>
+    <details class="bulk" id="manual">
+      <summary>뜻·예문 직접 입력하기</summary>
+      <input class="field" id="f-mean" placeholder="뜻 (비워 두면 자동으로 찾아요)">
+      <input class="field" id="f-ex" placeholder="예문 (비워 두면 자동으로 만들어요)">
+    </details>
+    <details class="bulk" id="bulk">
+      <summary>여러 단어 한꺼번에 넣기</summary>
+      <textarea class="field" id="f-bulk" placeholder="한 줄에 한 단어씩&#10;abundant&#10;candid&#10;give up"></textarea>
+      <p class="hint">한 번에 30개까지 뜻과 예문을 찾아 저장해요.</p>
+      <div><button class="btn" id="bulk-go" type="button">뜻 찾아서 모두 저장</button></div>
+    </details>
+    <div id="banner"></div>
+    <div class="row">
+      <input class="field grow" id="f-search" type="search" placeholder="단어나 뜻으로 찾기">
+      <button class="btn chip" id="only-repeat" type="button"></button>
+      <span id="filter-slot"></span>
+    </div>
+    <div class="list" id="list"></div></div>`;
+  const busy=(b,on,label)=>{ b.disabled=on; b.textContent=label; };
+  $("#addform").onsubmit=async e=>{
+    e.preventDefault();
+    const go=$("#f-go"), word=$("#f-word").value.trim(), meaning=$("#f-mean").value.trim(), example=$("#f-ex").value.trim();
+    if(!word||go.disabled) return;
+    const done=()=>{ $("#f-word").value=$("#f-mean").value=$("#f-ex").value=""; $("#dup-hint").hidden=true; $("#manual").open=false; $("#f-word").focus(); };
+    const again=o=>{ const n=meetAgain(o); if(example&&!o.example) patch(o,{example}); onlyRepeat=false; filterBox=0; query=""; $("#f-search").value=""; toast(`또 만난 단어예요! "${o.word}" ${n}번째 · 서랍 1로 돌아가요`); done(); renderListBody(); };
+    const old=findByWord(word);
+    if(old){ again(old); return; }
+    if(meaning&&example){ put(newWord({word,meaning,example})); toast(`"${word}" 저장됨`); done(); return; }
+    busy(go,true,"뜻 찾는 중…");
+    try{
+      const r=(await lookup([word]))[0];
+      if(!r||r.valid===false||!r.meaning){ toast(`"${word}"의 뜻을 찾지 못했어요. 철자를 확인하거나 뜻을 직접 입력해 주세요.`); $("#manual").open=true; return; }
+      const base=findByWord(r.word||word);
+      if(base){ again(base); return; }
+      put(newWord({...r,word:r.word||word,meaning:meaning||r.meaning,example:example||r.example,exampleKo:example?"":r.exampleKo}));
+      toast(`"${r.word||word}" 저장됨 · ${meaning||r.meaning}`); done();
+    }catch(err){
+      if(meaning){ put(newWord({word,meaning,example})); toast(`"${word}" 저장됨`); done(); }
+      else { toast(lookupError(err)); $("#manual").open=true; $("#f-mean").focus(); }
+    }finally{ busy(go,false,"뜻 찾아서 저장"); }
+  };
+  $("#f-word").oninput=()=>{
+    const h=$("#dup-hint"), o=findByWord($("#f-word").value.trim());
+    if(o){ h.innerHTML=`<b>${esc(o.word)}</b>는 이미 단어장에 있어요 (${esc(o.meaning)}). 저장하면 <b>${seen(o)+1}번째 만남</b>으로 표시되고 서랍 1로 돌아가요.`; h.hidden=false; }
+    else h.hidden=true;
+  };
+  $("#bulk-go").onclick=async()=>{
+    const b=$("#bulk-go");
+    const lines=[...new Set($("#f-bulk").value.split(/\n/).map(l=>l.split(/\t|,|:|\s-\s|=/)[0].trim()).filter(Boolean).map(s=>s.toLowerCase()))].slice(0,30);
+    if(!lines.length){ toast("한 줄에 한 단어씩 적어 주세요."); return; }
+    const againIds=new Set(), ask=[];
+    lines.forEach(l=>{ const o=findByWord(l); if(o){ if(!againIds.has(o.id)){againIds.add(o.id);meetAgain(o);} } else ask.push(l); });
+    let added=0, bad=[];
+    if(ask.length){
+      busy(b,true,`${ask.length}개 뜻 찾는 중…`);
+      try{
+        const res=await lookup(ask);
+        const now=Date.now();
+        res.forEach((r,i)=>{
+          if(!r||r.valid===false||!r.meaning){ bad.push(r?.input||ask[i]); return; }
+          const o=findByWord(r.word||r.input);
+          if(o){ if(!againIds.has(o.id)){againIds.add(o.id);meetAgain(o);} return; }
+          const w=newWord({...r,word:r.word||r.input,meaning:r.meaning,example:r.example,exampleKo:r.exampleKo}); w.created=now+i;
+          words.set(w.id,w); put(w); added++;
+        });
+      }catch(err){ toast(lookupError(err)); busy(b,false,"뜻 찾아서 모두 저장"); return; }
+      busy(b,false,"뜻 찾아서 모두 저장");
+    }
+    $("#f-bulk").value=bad.join("\n");
+    toast(`새 단어 ${added}개 저장${againIds.size?` · 또 나온 단어 ${againIds.size}개`:""}${bad.length?` · 못 찾은 단어 ${bad.length}개는 남겨 뒀어요`:""}`);
+    renderListBody();
+  };
+  const s=$("#f-search"); s.value=query; s.oninput=()=>{ query=s.value; renderListBody(); };
+  $("#only-repeat").onclick=()=>{onlyRepeat=!onlyRepeat;renderListBody()};
+  $("#view .stage").addEventListener("click",e=>{
+    const sp=e.target.closest("[data-speak]"); if(sp){ speak(sp.dataset.speak); return; }
+    const k=e.target.closest("#keep-samples"); if(k){ k.disabled=true; const now=Date.now(); Promise.all(sampleWords.map((w,i)=>{const n={...clean(w),id:uid(),lookups:1,created:now+i};return put(n)})).then(()=>toast("예시 단어 20개를 담았어요")); return; }
+    const cf=e.target.closest("#clear-filter"); if(cf){ filterBox=0; render(); return; }
+    const d=e.target.closest("[data-del]"); if(d){
+      const id=d.dataset.del;
+      if(armedDel===id){ armedDel=null; remove(id); toast("삭제됨"); }
+      else { armedDel=id; renderListBody(); clearTimeout(listShell.t); listShell.t=setTimeout(()=>{armedDel=null;if(tab==="list")renderListBody()},3000); }
+    }
+  });
+}
+function renderList(){
+  if(!$("#addform")) listShell();
+  renderListBody();
+}
+function renderListBody(){
+  if(!$("#list")) return;
+  let list=all();
+  if(filterBox) list=list.filter(w=>(w.box||1)===filterBox);
+  if(query){ const q=query.toLowerCase(); list=list.filter(w=>(w.word+" "+w.meaning).toLowerCase().includes(q)); }
+  if(onlyRepeat) list=list.filter(w=>seen(w)>=2);
+  list.sort((a,b)=>(b.lastSeen||b.created||0)-(a.lastSeen||a.created||0));
+  const repeatCount=all().filter(w=>seen(w)>=2).length;
+  $("#banner").innerHTML=usingSamples()?`<div class="banner"><span>아래는 예시 단어예요. 직접 단어를 저장하면 예시는 사라져요.</span><button class="btn" id="keep-samples" type="button">예시 20개를 내 단어장에 담기</button></div>`:"";
+  const ch=$("#only-repeat"); ch.textContent=`또 나온 단어 ${repeatCount}`; ch.setAttribute("aria-pressed",onlyRepeat);
+  $("#filter-slot").innerHTML=filterBox?`<button class="btn" id="clear-filter" type="button">서랍 ${filterBox} 필터 해제</button>`:"";
+  $("#list").innerHTML=!loaded?`<div class="empty">불러오는 중…</div>`:list.length?list.map(w=>`
+      <div class="item ${seen(w)>=2?"repeat":""} ${flashId===w.id?"flash":""}">
+        <div class="hw"><span class="w">${esc(w.word)}</span>${w.phonetic?`<span class="ipa">${esc(w.phonetic)}</span>`:""}${w.pos?`<span class="pos">${esc(w.pos)}</span>`:""}${seen(w)>=2?`<span class="again">${seen(w)}번째 만남</span>`:""}<button class="icon" data-speak="${esc(w.word)}" aria-label="${esc(w.word)} 발음 듣기">${speakIcon}</button><a class="dict" href="https://en.dict.naver.com/#/search?query=${encodeURIComponent(w.word)}" target="_blank" rel="noopener">사전</a></div>
+        <div class="mean">${esc(w.meaning)}${w.def?`<span class="def">${esc(w.def)}</span>`:""}</div>
+        ${w.example?`<div class="exs">${esc(w.example)}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`:""}
+        <div class="side"><span class="pill">서랍 ${w.box||1}</span>${pill(w)}${w.sample?"":`<button class="del ${armedDel===w.id?"arm":""}" data-del="${w.id}">${armedDel===w.id?"정말 삭제":"삭제"}</button>`}</div>
+      </div>`).join(""):`<div class="empty">${query||filterBox||onlyRepeat?"조건에 맞는 단어가 없어요.":"아직 단어가 없어요. 위에 모르는 영어 단어를 적고 저장해 보세요."}</div>`;
+  const fl=$("#list .item.flash"); if(fl){ fl.scrollIntoView({block:"nearest"}); setTimeout(()=>{flashId=null},1600); }
+}
+
+
+/* ---------- cards tab ---------- */
+function newSession(useAll){
+  const list=all(), due=list.filter(isDue);
+  const pick=(useAll||!due.length)?list:due;
+  session={queue:shuffle(pick).map(w=>w.id),i:0,flip:false,known:0,unknown:0,extra:!due.length||useAll};
+}
+function findWord(id){ return words.get(id)||sampleWords.find(w=>w.id===id); }
+function grade(ok){
+  const w=findWord(session.queue[session.i]); if(!w) return;
+  const box=ok?Math.min(5,(w.box||1)+1):1;
+  const due=ok?startOfToday()+BOX_DAYS[box]*DAY:0;
+  if(ok) session.known++; else { session.unknown++; session.queue.push(w.id); }
+  session.i++; session.flip=false;
+  patch(w,{box,due,right:(w.right||0)+(ok?1:0),wrong:(w.wrong||0)+(ok?0:1)});
+  renderCards();
+}
+function renderCards(){
+  const v=$("#view");
+  if(!loaded){ v.innerHTML=`<div class="empty">불러오는 중…</div>`; return; }
+  if(!all().length){ v.innerHTML=`<div class="done-box"><h2>단어가 없어요</h2><p class="hint">단어장 탭에서 먼저 단어를 추가해 주세요.</p></div>`; return; }
+  if(!session) newSession(false);
+  const q=session.queue;
+  if(session.i>=q.length){
+    v.innerHTML=`<div class="done-box"><h2>복습 끝!</h2>
+      <p>알아요 <b>${session.known}</b> · 몰라요 <b>${session.unknown}</b></p>
+      <p class="hint">${all().filter(isDue).length?"아직 복습할 단어가 남아 있어요.":"오늘 복습할 단어를 모두 마쳤어요. 서랍 번호가 올라간 단어는 정해진 날에 다시 나와요."}</p>
+      <div class="row" style="justify-content:center"><button class="btn pri" id="again">다시 하기</button><button class="btn" id="all">전체 단어로 연습</button></div></div>`;
+    $("#again").onclick=()=>{session=null;renderCards()};
+    $("#all").onclick=()=>{newSession(true);renderCards()};
+    return;
+  }
+  const w=findWord(q[session.i]);
+  if(!w){ session.i++; renderCards(); return; }
+  const pct=Math.round(session.i/q.length*100);
+  v.innerHTML=`<div class="stage">
+    ${session.extra&&session.i===0?`<div class="banner"><span>오늘 복습할 단어가 없어서 전체 단어로 연습해요.</span></div>`:""}
+    <div class="prog"><span>${session.i+1} / ${q.length}</span><span>알아요 ${session.known} · 몰라요 ${session.unknown}</span></div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="card ${session.flip?"flip":""}" id="card" tabindex="0" role="button" aria-label="카드 뒤집기">
+      <div class="card-in">
+        <div class="face front"><span class="boxno">서랍 ${w.box||1}</span>${seen(w)>=2?`<span class="again card-again">${seen(w)}번째 만남</span>`:""}<div class="big">${esc(w.word)}</div>
+          <button class="icon" id="cspeak" aria-label="발음 듣기">${speakIcon}</button><span class="tip">눌러서 뜻 보기 · Space</span></div>
+        <div class="face back"><span class="boxno">서랍 ${w.box||1}</span><div class="big" style="font-size:1.6rem">${esc(w.word)}</div>${w.phonetic?`<div class="ipa">${esc(w.phonetic)}</div>`:""}<div class="m">${esc(w.meaning)}</div>${w.pos?`<div class="pos">${esc(w.pos)}</div>`:""}${w.example?`<div class="e">${esc(w.example)}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`:""}</div>
+      </div>
+    </div>
+    <div class="answer">
+      <button class="btn no" id="no" ${session.flip?"":"disabled"}>몰라요<span class="kbd">1</span></button>
+      <button class="btn yes" id="yes" ${session.flip?"":"disabled"}>알아요<span class="kbd">2</span></button>
+    </div></div>`;
+  $("#card").onclick=e=>{ if(e.target.closest("#cspeak")) return; session.flip=!session.flip; renderCards(); };
+  $("#cspeak").onclick=()=>speak(w.word);
+  $("#no").onclick=()=>grade(false);
+  $("#yes").onclick=()=>grade(true);
+}
+
+/* ---------- random quiz tab ---------- */
+const QUIZ_N=10;
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+function blankOf(w){
+  if(!w.example) return null;
+  const stem=w.word.length>4&&!/\s/.test(w.word)?w.word.replace(/e$|y$/i,""):w.word;
+  const re=new RegExp("\\b"+reEsc(stem)+"[a-z]*","i");
+  return re.test(w.example)?w.example.replace(re,"_____"):null;
+}
+const QTYPE={en:"영어 → 뜻",ko:"뜻 → 영어",blank:"빈칸 채우기"};
+function newQuiz(){
+  const list=all();
+  const qs=shuffle(list).slice(0,QUIZ_N).map(w=>{
+    const types=["en","ko"]; if(blankOf(w)) types.push("blank","blank");
+    const type=types[Math.random()*types.length|0];
+    const others=shuffle(list.filter(o=>o.id!==w.id&&o.meaning!==w.meaning)).slice(0,3);
+    return {id:w.id,type,opts:shuffle([w,...others]).map(o=>o.id),picked:null};
+  });
+  quiz={qs,i:0,score:0,missed:[]};
+}
+function renderQuiz(){
+  const v=$("#view");
+  if(!loaded){ v.innerHTML=`<div class="empty">불러오는 중…</div>`; return; }
+  if(all().length<4){ v.innerHTML=`<div class="done-box"><h2>단어가 조금 더 필요해요</h2><p class="hint">보기 4개를 만들려면 단어가 4개 이상 있어야 해요. 지금 ${all().length}개예요.</p></div>`; return; }
+  if(!quiz) newQuiz();
+  if(quiz.i>=quiz.qs.length){
+    const n=quiz.qs.length, missed=quiz.missed.map(findWord).filter(Boolean);
+    v.innerHTML=`<div class="done-box"><h2>${quiz.score} / ${n}</h2>
+      <p class="hint">${quiz.score===n?"모두 맞혔어요.":"틀린 단어는 서랍 1로 돌아가 카드 복습에 다시 나와요."}</p>
+      ${missed.length?`<div class="missed">${missed.map(w=>`<div><b>${esc(w.word)}</b> ${esc(w.meaning)}</div>`).join("")}</div>`:""}
+      <button class="btn pri" id="qagain">새 랜덤 퀴즈 ${Math.min(QUIZ_N,all().length)}문제</button></div>`;
+    $("#qagain").onclick=()=>{newQuiz();renderQuiz()};
+    return;
+  }
+  const q=quiz.qs[quiz.i], w=findWord(q.id);
+  if(!w){ quiz.i++; renderQuiz(); return; }
+  const showEn=q.type!=="en";
+  const prompt=q.type==="en"?`<div class="q-word">${esc(w.word)}</div>`
+    :q.type==="ko"?`<div class="q-word ko">${esc(w.meaning)}</div>`
+    :`<div class="q-sent">${esc(blankOf(w)).replace("_____",'<span class="gap">_____</span>')}${w.exampleKo?`<span class="exko">${esc(w.exampleKo)}</span>`:""}</div>`;
+  v.innerHTML=`<div class="stage">
+    <div class="prog"><span>${quiz.i+1} / ${quiz.qs.length} · <span class="qtype">${QTYPE[q.type]}</span></span><span>맞힘 ${quiz.score}</span></div>
+    <div class="bar"><i style="width:${Math.round(quiz.i/quiz.qs.length*100)}%"></i></div>
+    ${prompt}
+    <div class="choices">${q.opts.map(id=>{const o=findWord(id); if(!o) return ""; let cls="";
+      if(q.picked){ if(id===q.id) cls="right"; else if(id===q.picked) cls="wrong"; }
+      return `<button class="choice ${showEn?"en":""} ${cls}" data-opt="${id}" ${q.picked?"disabled":""}>${showEn?esc(o.word):esc(o.meaning)}</button>`}).join("")}</div>
+    ${q.picked?`<div class="row" style="justify-content:space-between"><span class="hint">${q.picked===q.id?"정답이에요.":`정답: <b>${esc(w.word)}</b> — ${esc(w.meaning)}`}</span><button class="btn pri" id="qnext">${quiz.i+1<quiz.qs.length?"다음 문제":"결과 보기"}</button></div>`:""}
+  </div>`;
+  v.querySelectorAll("[data-opt]").forEach(b=>b.onclick=()=>{
+    q.picked=b.dataset.opt; const ok=q.picked===q.id;
+    if(ok) quiz.score++; else quiz.missed.push(w.id);
+    patch(w,ok?{right:(w.right||0)+1}:{wrong:(w.wrong||0)+1,box:1,due:0});
+    if(showEn) speak(w.word);
+    renderQuiz();
+  });
+  const nx=$("#qnext"); if(nx){ nx.onclick=()=>{quiz.i++;renderQuiz()}; nx.focus(); }
+}
+
+
+/* ---------- shell ---------- */
+function render(){
+  renderHeader();
+  if(tab==="cards") renderCards(); else if(tab==="quiz") renderQuiz(); else renderList();
+}
+document.querySelector(".tabs").addEventListener("click",e=>{
+  const t=e.target.closest(".tab"); if(!t) return;
+  tab=t.dataset.tab; try{localStorage.setItem(LSKEY+".tab",tab)}catch(err){}
+  if(tab==="cards") session=null;
+  render();
+});
+$("#drawers").addEventListener("click",e=>{
+  const d=e.target.closest(".drawer"); if(!d) return;
+  const b=+d.dataset.box; filterBox=filterBox===b?0:b; tab="list"; render();
+});
+document.addEventListener("keydown",e=>{
+  if(tab!=="cards"||!session||e.target.matches("input,textarea")) return;
+  if(e.code==="Space"){ e.preventDefault(); session.flip=!session.flip; renderCards(); }
+  else if(session.flip&&(e.key==="1"||e.key==="ArrowLeft")) grade(false);
+  else if(session.flip&&(e.key==="2"||e.key==="ArrowRight")) grade(true);
+});
+init();
+if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
+</script>
+</body>
+</html>
